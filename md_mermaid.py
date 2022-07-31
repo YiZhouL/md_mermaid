@@ -11,21 +11,28 @@ License: GNU GPLv3
 """
 
 from markdown.extensions import Extension
-from markdown.preprocessors import Preprocessor
+from markdown.preprocessors import NormalizeWhitespace
 
 import re
 import string
 
+
 def strip_notprintable(myStr):
     return ''.join(filter(lambda x: x in string.printable, myStr))
+
 
 MermaidRegex = re.compile(r"^(?P<mermaid_sign>[\~\`]){3}[\ \t]*[Mm]ermaid[\ \t]*$")
 
 
 # ------------------ The Markdown Extension -------------------------------
 
-class MermaidPreprocessor(Preprocessor):
+class MermaidPreprocessor(NormalizeWhitespace):
+    def __init__(self, md, config):
+        super().__init__(md)
+        self.config = config
+
     def run(self, lines):
+        lines = super(MermaidPreprocessor, self).run(lines)
         old_line = ""
         new_lines = []
         mermaid_sign = ""
@@ -57,27 +64,30 @@ class MermaidPreprocessor(Preprocessor):
                 new_lines.append("")
                 m_end = None
             elif in_mermaid_code:
-                new_lines.append(strip_notprintable(line).strip())
+                if not self.config.get("include-utf8", True):
+                    new_lines.append(strip_notprintable(line).strip())
+                else:
+                    new_lines.append(line.strip())
             else:
                 new_lines.append(line)
 
             old_line = line
 
-        if is_mermaid:
-            new_lines.append('')
+        # if is_mermaid:
+        #     new_lines.append('')
             # This will initialize mermaid renderer. It's done only when the HTML document is ready,
             # to ensure the loading of mermaid.js file is finished.
-            new_lines.append('''<script>
-                    function initializeMermaid() {
-                        mermaid.initialize({startOnLoad:true})
-                    }
-            
-                    if (document.readyState === "complete" || document.readyState === "interactive") {
-                        setTimeout(initializeMermaid, 1);
-                    } else {
-                        document.addEventListener("DOMContentLoaded", initializeMermaid);
-                    }
-            </script>''')
+            # new_lines.append('''<script>
+            #         function initializeMermaid() {
+            #             mermaid.initialize({startOnLoad:true})
+            #         }
+            #
+            #         if (document.readyState === "complete" || document.readyState === "interactive") {
+            #             setTimeout(initializeMermaid, 1);
+            #         } else {
+            #             document.addEventListener("DOMContentLoaded", initializeMermaid);
+            #         }
+            # </script>''')
 
         return new_lines
 
@@ -85,12 +95,20 @@ class MermaidPreprocessor(Preprocessor):
 class MermaidExtension(Extension):
     """ Add source code hilighting to markdown codeblocks. """
 
-    def extendMarkdown(self, md, md_globals):
+    def __init__(self, **kwargs):
+        self.config = {
+            "include-utf8": [True,
+                              "include utf-8, not only ascii."]
+        }
+        super().__init__(**kwargs)
+
+    def extendMarkdown(self, md):
         """ Add HilitePostprocessor to Markdown instance. """
         # Insert a preprocessor before ReferencePreprocessor
-        md.preprocessors.register(MermaidPreprocessor(md), 'mermaid', 35)
+        md.preprocessors.register(MermaidPreprocessor(md, self.getConfigs()), 'mermaid', 35)
 
         md.registerExtension(self)
+
 
 def makeExtension(**kwargs):  # pragma: no cover
     return MermaidExtension(**kwargs)
