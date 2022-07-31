@@ -11,7 +11,7 @@ License: GNU GPLv3
 """
 
 from markdown.extensions import Extension
-from markdown.preprocessors import NormalizeWhitespace
+from markdown.preprocessors import Preprocessor
 
 import re
 import string
@@ -26,13 +26,12 @@ MermaidRegex = re.compile(r"^(?P<mermaid_sign>[\~\`]){3}[\ \t]*[Mm]ermaid[\ \t]*
 
 # ------------------ The Markdown Extension -------------------------------
 
-class MermaidPreprocessor(NormalizeWhitespace):
+class MermaidPreprocessor(Preprocessor):
     def __init__(self, md, config):
         super().__init__(md)
         self.config = config
 
     def run(self, lines):
-        lines = super(MermaidPreprocessor, self).run(lines)
         old_line = ""
         new_lines = []
         mermaid_sign = ""
